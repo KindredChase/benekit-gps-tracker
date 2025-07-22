@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS 추적 & GPX 생성 앱</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+            user-select: none;
+        }
+        
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+            min-height: calc(100vh - 20px);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .status-section {
+            padding: 30px 20px;
+            text-align: center;
+        }
+        
+        .status-display {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        
+        .status-indicator {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .status-ready {
+            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+            color: white;
+        }
+        
+        .status-tracking {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-paused {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            color: white;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .status-text {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .status-details {
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .stat-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #3498db;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+        
+        .controls {
+            padding: 0 20px 30px;
+        }
+        
+        .btn {
+            width: 100%;
+            border: none;
+            border-radius: 15px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 15px;
+            padding: 18px;
+        }
+        
+        .btn:active {
+            transform: scale(0.95);
+        }
+        
+        .btn-start {
+            background: linear-gradient(135deg, #27ae60, #229954);
+            color: white;
+        }
+        
+        .btn-start:hover {
+            box-shadow: 0 8px 25px rgba(39, 174, 96, 0.3);
+        }
+        
+        .btn-pause {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            color: white;
+        }
+        
+        .btn-pause:hover {
+            box-shadow: 0 8px 25px rgba(243, 156, 18, 0.3);
+        }
+        
+        .btn-stop {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+        }
+        
+        .btn-stop:hover {
+            box-shadow: 0 8px 25px rgba(231, 76, 60, 0.3);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            box-shadow: 0 8px 25px rgba(149, 165, 166, 0.3);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .gps-info {
+            background: #e8f5e8;
+            border: 2px solid #27ae60;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 20px;
+            font-size: 0.85em;
+        }
+        
+        .gps-info.error {
+            background: #f8d7da;
+            border-color: #e74c3c;
+            color: #721c24;
+        }
+        
+        .gps-info.warning {
+            background: #fff3cd;
+            border-color: #f39c12;
+            color: #856404;
+        }
+        
+        .point-counter {
+            background: #d1ecf1;
+            border: 2px solid #17a2b8;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 20px;
+            text-align: center;
+        }
+        
+        .point-counter h4 {
+            color: #0c5460;
+            margin-bottom: 10px;
+        }
+        
+        .coordinates {
+            font-family: 'Courier New', monospace;
+            font-size: 0.8em;
+            color: #17a2b8;
+        }
+        
+        .download-section {
+            padding: 20px;
+            border-top: 1px solid #eee;
+            background: #f8f9fa;
+        }
+        
+        .file-list {
+            margin-top: 15px;
+        }
+        
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        
+        .file-info {
+            flex: 1;
+        }
+        
+        .file-name {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .file-details {
+            color: #7f8c8d;
+            font-size: 0.8em;
+        }
+        
+        .btn-download {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-size: 0.8em;
+            cursor: pointer;
+        }
+        
+        .accuracy-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 5px;
+        }
+        
+        .accuracy-good { background: #27ae60; }
+        .accuracy-medium { background: #f39c12; }
+        .accuracy-poor { background: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏃‍♂️ GPS 추적 앱</h1>
+            <p>정확한 GPX 파일 생성을 위한 실시간 GPS 추적</p>
+        </div>
+        
+        <div class="status-section">
+            <div class="status-display">
+                <div class="status-indicator status-ready" id="statusIndicator">
+                    ⏸️
+                </div>
+                <div class="status-text" id="statusText">준비 상태</div>
+                <div class="status-details" id="statusDetails">운동 시작 버튼을 눌러주세요</div>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-value" id="duration">00:00</span>
+                    <span class="stat-label">경과 시간</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="distance">0.00</span>
+                    <span class="stat-label">거리 (km)</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="speed">0.0</span>
+                    <span class="stat-label">속도 (km/h)</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="elevation">--</span>
+                    <span class="stat-label">고도 (m)</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button class="btn btn-start" id="startBtn" onclick="startTracking()">
+                🏁 운동 시작
+            </button>
+            <button class="btn btn-pause" id="pauseBtn" onclick="pauseTracking()" disabled>
+                ⏸️ 일시정지
+            </button>
+            <button class="btn btn-stop" id="stopBtn" onclick="stopTracking()" disabled>
+                🏃 운동 종료 & GPX 생성
+            </button>
+            <button class="btn btn-secondary" onclick="clearData()">
+                🗑️ 데이터 초기화
+            </button>
+        </div>
+        
+        <div class="gps-info" id="gpsInfo">
+            GPS 권한을 확인하는 중...
+        </div>
+        
+        <div class="point-counter">
+            <h4>📍 기록된 GPS 포인트</h4>
+            <div style="font-size: 1.5em; font-weight: bold; color: #17a2b8;" id="pointCount">0</div>
+            <div class="coordinates" id="currentCoords">위치 정보 대기 중...</div>
+        </div>
+        
+        <div class="download-section">
+            <h3 style="margin-bottom: 15px; color: #2c3e50;">📁 생성된 GPX 파일</h3>
+            <div class="file-list" id="fileList">
+                <div style="text-align: center; color: #7f8c8d; padding: 20px;">
+                    아직 생성된 파일이 없습니다
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 전역 변수
+        let isTracking = false;
+        let isPaused = false;
+        let watchId = null;
+        let trackPoints = [];
+        let startTime = null;
+        let pausedTime = 0;
+        let lastPosition = null;
+        let totalDistance = 0;
+        let currentSpeed = 0;
+        let sessionFiles = [];
+        
+        // DOM 요소
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const statusDetails = document.getElementById('statusDetails');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const gpsInfo = document.getElementById('gpsInfo');
+        const pointCount = document.getElementById('pointCount');
+        const currentCoords = document.getElementById('currentCoords');
+        const fileList = document.getElementById('fileList');
+        
+        // 통계 표시 요소
+        const durationEl = document.getElementById('duration');
+        const distanceEl = document.getElementById('distance');
+        const speedEl = document.getElementById('speed');
+        const elevationEl = document.getElementById('elevation');
+        
+        // GPS 권한 및 지원 확인
+        async function checkGPSSupport() {
+            if (!navigator.geolocation) {
+                showGPSError('이 브라우저는 GPS를 지원하지 않습니다.');
+                return false;
+            }
+            
+            try {
+                // 권한 확인
+                const permission = await navigator.permissions.query({name: 'geolocation'});
+                if (permission.state === 'denied') {
+                    showGPSError('GPS 권한이 거부되었습니다. 브라우저 설정에서 위치 권한을 허용해주세요.');
+                    return false;
+                }
+                
+                showGPSInfo('GPS 권한이 확인되었습니다. 정확도 향상을 위해 야외에서 사용하세요.');
+                return true;
+            } catch (error) {
+                showGPSWarning('GPS 권한을 확인할 수 없습니다. 위치 서비스를 활성화해주세요.');
+                return true; // 권한 API를 지원하지 않는 브라우저에서도 시도
+            }
+        }
+        
+        function showGPSInfo(message) {
+            gpsInfo.className = 'gps-info';
+            gpsInfo.innerHTML = `✅ ${message}`;
+        }
+        
+        function showGPSWarning(message) {
+            gpsInfo.className = 'gps-info warning';
+            gpsInfo.innerHTML = `⚠️ ${message}`;
+        }
+        
+        function showGPSError(message) {
+            gpsInfo.className = 'gps-info error';
+            gpsInfo.innerHTML = `❌ ${message}`;
+        }
+        
+        // 거리 계산 함수 (Haversine formula)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // 지구 반지름 (km)
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+        
+        // GPS 위치 업데이트 처리
+        function handlePositionUpdate(position) {
+            const { latitude, longitude, altitude, accuracy, speed } = position.coords;
+            const timestamp = new Date(position.timestamp);
+            
+            // 정확도 표시
+            const accuracyClass = accuracy < 10 ? 'accuracy-good' : 
+                                accuracy < 30 ? 'accuracy-medium' : 'accuracy-poor';
+            
+            currentCoords.innerHTML = `
+                위도: ${latitude.toFixed(6)}<br>
+                경도: ${longitude.toFixed(6)}<br>
+                정확도: ${accuracy.toFixed(1)}m <span class="accuracy-indicator ${accuracyClass}"></span>
+            `;
+            
+            // 추적 중일 때만 포인트 기록
+            if (isTracking && !isPaused) {
+                const trackPoint = {
+                    latitude: latitude,
+                    longitude: longitude,
+                    elevation: altitude,
+                    time: timestamp,
+                    accuracy: accuracy,
+                    speed: speed
+                };
+                
+                trackPoints.push(trackPoint);
+                pointCount.textContent = trackPoints.length;
+                
+                // 거리 계산
+                if (lastPosition) {
+                    const distance = calculateDistance(
+                        lastPosition.latitude, lastPosition.longitude,
+                        latitude, longitude
+                    );
+                    
+                    // 비현실적인 거리 변화 필터링 (200km/h 이상)
+                    if (distance < 1.0) { // 1km 미만만 허용
+                        totalDistance += distance;
+                    }
+                }
+                
+                lastPosition = { latitude, longitude };
+                
+                // 속도 계산 (GPS 속도가 있으면 사용, 없으면 계산)
+                if (speed !== null && speed >= 0) {
+                    currentSpeed = speed * 3.6; // m/s to km/h
+                } else if (trackPoints.length >= 2) {
+                    const prevPoint = trackPoints[trackPoints.length - 2];
+                    const timeDiff = (timestamp - new Date(prevPoint.time)) / 1000; // 초
+                    if (timeDiff > 0 && lastPosition) {
+                        const distance = calculateDistance(
+                            prevPoint.latitude, prevPoint.longitude,
+                            latitude, longitude
+                        );
+                        currentSpeed = (distance / timeDiff) * 3600; // km/h
+                    }
+                }
+                
+                updateStats();
+                
+                // 정확도에 따른 피드백
+                if (accuracy > 50) {
+                    showGPSWarning(`GPS 정확도가 낮습니다 (${accuracy.toFixed(1)}m). 하늘이 잘 보이는 곳으로 이동해주세요.`);
+                } else if (accuracy < 10) {
+                    showGPSInfo(`GPS 신호가 양호합니다 (정확도: ${accuracy.toFixed(1)}m)`);
+                }
+            }
+            
+            // 고도 정보 업데이트
+            if (altitude !== null) {
+                elevationEl.textContent = Math.round(altitude);
+            }
+        }
+        
+        // GPS 오류 처리
+        function handlePositionError(error) {
+            let message = '';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    message = "GPS 권한이 거부되었습니다. 브라우저 설정에서 위치 권한을 허용해주세요.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message = "GPS 위치 정보를 사용할 수 없습니다. 위치 서비스를 활성화해주세요.";
+                    break;
+                case error.TIMEOUT:
+                    message = "GPS 신호 수신 시간이 초과되었습니다. 하늘이 잘 보이는 곳으로 이동해주세요.";
+                    break;
+                default:
+                    message = "GPS 오류가 발생했습니다.";
+                    break;
+            }
+            showGPSError(message);
+        }
+        
+        // 통계 업데이트
+        function updateStats() {
+            // 경과 시간
+            if (startTime) {
+                const now = Date.now();
+                const elapsed = (now - startTime - pausedTime) / 1000;
+                const hours = Math.floor(elapsed / 3600);
+                const minutes = Math.floor((elapsed % 3600) / 60);
+                const seconds = Math.floor(elapsed % 60);
+                durationEl.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            // 거리
+            distanceEl.textContent = totalDistance.toFixed(2);
+            
+            // 속도
+            speedEl.textContent = Math.max(0, currentSpeed).toFixed(1);
+        }
+        
+        // 추적 시작
+        async function startTracking() {
+            const gpsSupported = await checkGPSSupport();
+            if (!gpsSupported) return;
+            
+            // 초기화
+            if (!isTracking) {
+                trackPoints = [];
+                totalDistance = 0;
+                lastPosition = null;
+                startTime = Date.now();
+                pausedTime = 0;
+            } else if (isPaused) {
+                // 일시정지에서 재개
+                pausedTime += Date.now() - pauseStartTime;
+            }
+            
+            isTracking = true;
+            isPaused = false;
+            
+            // UI 업데이트
+            statusIndicator.className = 'status-indicator status-tracking';
+            statusIndicator.textContent = '🏃';
+            statusText.textContent = '추적 중';
+            statusDetails.textContent = 'GPS 위치를 기록하고 있습니다';
+            
+            startBtn.disabled = true;
+            pauseBtn.disabled = false;
+            stopBtn.disabled = false;
+            
+            // GPS 추적 시작
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            };
+            
+            watchId = navigator.geolocation.watchPosition(
+                handlePositionUpdate,
+                handlePositionError,
+                options
+            );
+            
+            // 통계 업데이트 타이머
+            updateInterval = setInterval(updateStats, 1000);
+            
+            showGPSInfo('GPS 추적을 시작했습니다. 정확한 기록을 위해 폰을 들고 다니세요.');
+        }
+        
+        // 추적 일시정지
+        function pauseTracking() {
+            isPaused = true;
+            pauseStartTime = Date.now();
+            
+            // UI 업데이트
+            statusIndicator.className = 'status-indicator status-paused';
+            statusIndicator.textContent = '⏸️';
+            statusText.textContent = '일시정지';
+            statusDetails.textContent = '운동이 일시정지되었습니다';
+            
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+            startBtn.innerHTML = '▶️ 추적 재개';
+            
+            showGPSWarning('추적이 일시정지되었습니다. 재개하려면 추적 재개 버튼을 누르세요.');
+        }
+        
+        // 추적 중지 및 GPX 생성
+        function stopTracking() {
+            if (!isTracking || trackPoints.length === 0) {
+                alert('기록된 GPS 데이터가 없습니다.');
+                return;
+            }
+            
+            // 추적 중지
+            isTracking = false;
+            isPaused = false;
+            
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            
+            if (updateInterval) {
+                clearInterval(updateInterval);
+                updateInterval = null;
+            }
+            
+            // UI 업데이트
+            statusIndicator.className = 'status-indicator status-ready';
+            statusIndicator.textContent = '✅';
+            statusText.textContent = '운동 완료';
+            statusDetails.textContent = 'GPX 파일이 생성되었습니다';
+            
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+            stopBtn.disabled = true;
+            startBtn.innerHTML = '🏁 운동 시작';
+            
+            // GPX 파일 생성
+            generateGPXFile();
+            
+            showGPSInfo(`운동이 완료되었습니다! 총 ${trackPoints.length}개의 GPS 포인트가 기록되었습니다.`);
+        }
+        
+        // GPX 파일 생성
+        function generateGPXFile() {
+            if (trackPoints.length === 0) return;
+            
+            const now = new Date();
+            const filename = `등산기록_${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}.gpx`;
+            
+            let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="BeneFit GPS Tracker" xmlns="http://www.topografix.com/GPX/1/1">
+    <metadata>
+        <name>${filename}</name>
+        <desc>BeneFit 앱으로 기록된 등산 경로</desc>
+        <time>${now.toISOString()}</time>
+    </metadata>
+    <trk>
+        <name>등산 기록</name>
+        <desc>총 거리: ${totalDistance.toFixed(2)}km, 포인트 수: ${trackPoints.length}개</desc>
+        <trkseg>
+`;
+            
+            trackPoints.forEach(point => {
+                gpxContent += `            <trkpt lat="${point.latitude.toFixed(6)}" lon="${point.longitude.toFixed(6)}">
+`;
+                if (point.elevation !== null) {
+                    gpxContent += `                <ele>${point.elevation.toFixed(1)}</ele>
+`;
+                }
+                gpxContent += `                <time>${point.time.toISOString()}</time>
+`;
+                if (point.accuracy !== null) {
+                    gpxContent += `                <extensions>
+                    <accuracy>${point.accuracy.toFixed(1)}</accuracy>
+                </extensions>
+`;
+                }
+                gpxContent += `            </trkpt>
+`;
+            });
+            
+            gpxContent += `        </trkseg>
+    </trk>
+</gpx>`;
+            
+            // 파일 정보 저장
+            const fileInfo = {
+                name: filename,
+                content: gpxContent,
+                date: now,
+                points: trackPoints.length,
+                distance: totalDistance.toFixed(2),
+                duration: durationEl.textContent
+            };
+            
+            sessionFiles.push(fileInfo);
+            updateFileList();
+        }
+        
+        // 파일 목록 업데이트
+        function updateFileList() {
+            if (sessionFiles.length === 0) {
+                fileList.innerHTML = '<div style="text-align: center; color: #7f8c8d; padding: 20px;">아직 생성된 파일이 없습니다</div>';
+                return;
+            }
+            
+            fileList.innerHTML = sessionFiles.map(file => `
+                <div class="file-item">
+                    <div class="file-info">
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-details">
+                            ${file.distance}km · ${file.points}포인트 · ${file.duration}
+                        </div>
+                    </div>
+                    <button class="btn-download" onclick="downloadFile('${file.name}')">
+                        다운로드
+                    </button>
+                </div>
+            `).join('');
+        }
+        
+        // 파일 다운로드
+        function downloadFile(filename) {
+            const file = sessionFiles.find(f => f.name === filename);
+            if (!file) return;
+            
+            const blob = new Blob([file.content], { type: 'application/gpx+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        // 데이터 초기화
+        function clearData() {
+            if (isTracking) {
+                if (!confirm('현재 추적 중입니다. 정말 초기화하시겠습니까?')) {
+                    return;
+                }
+                stopTracking();
+            }
+            
+            trackPoints = [];
+            totalDistance = 0;
+            lastPosition = null;
+            startTime = null;
+            pausedTime = 0;
+            currentSpeed = 0;
+            
+            // UI 초기화
+            statusIndicator.className = 'status-indicator status-ready';
+            statusIndicator.textContent = '⏸️';
+            statusText.textContent = '준비 상태';
+            statusDetails.textContent = '운동 시작 버튼을 눌러주세요';
+            
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+            stopBtn.disabled = true;
+            startBtn.innerHTML = '🏁 운동 시작';
+            
+            // 통계 초기화
+            durationEl.textContent = '00:00:00';
+            distanceEl.textContent = '0.00';
+            speedEl.textContent = '0.0';
+            elevationEl.textContent = '--';
+            pointCount.textContent = '0';
+            currentCoords.innerHTML = '위치 정보 대기 중...';
+            
+            showGPSInfo('모든 데이터가 초기화되었습니다.');
+        }
+        
+        // 페이지 로드 시 초기화
+        window.addEventListener('load', async () => {
+            await checkGPSSupport();
+            
+            // 화면 꺼짐 방지 (지원되는 브라우저에서)
+            if ('wakeLock' in navigator) {
+                try {
+                    await navigator.wakeLock.request('screen');
+                    console.log('화면 꺼짐 방지가 활성화되었습니다.');
+                } catch (err) {
+                    console.log('화면 꺼짐 방지를 설정할 수 없습니다:', err);
+                }
+            }
+            
+            // 배터리 최적화 안내
+            showGPSWarning('정확한 GPS 추적을 위해 배터리 절약 모드를 해제하고, 앱을 백그라운드로 전환하지 마세요.');
+        });
+        
+        // 페이지를 떠날 때 확인
+        window.addEventListener('beforeunload', (e) => {
+            if (isTracking && trackPoints.length > 0) {
+                e.preventDefault();
+                e.returnValue = '';
+                return '추적 중인 데이터가 있습니다. 정말 페이지를 떠나시겠습니까?';
+            }
+        });
+        
+        // 가시성 변경 감지 (백그라운드 전환)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && isTracking) {
+                showGPSWarning('앱이 백그라운드로 전환되었습니다. GPS 추적이 중단될 수 있으니 앱을 활성 상태로 유지해주세요.');
+            } else if (!document.hidden && isTracking) {
+                showGPSInfo('앱이 다시 활성화되었습니다. GPS 추적을 계속합니다.');
+            }
+        });
+        
+        // 전역 변수 선언 (누락된 부분)
+        let updateInterval = null;
+        let pauseStartTime = null;
+        
+        console.log('GPS 추적 앱이 초기화되었습니다.');
+    </script>
+</body>
+</html>
